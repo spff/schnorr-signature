@@ -1,0 +1,5 @@
+Describe Schnorr signature in detail (Schnorr, C. P.: Efficient identification and
+signatures for smart cards. In Advances in Cryptology - CRYPTO’89, Berlin, New
+York, Tokyo, 1990, vol. 435 of Lecture.) and compare it with other Elgamal-like
+sihmatures.
+
