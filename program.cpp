@@ -5,7 +5,7 @@
 using namespace std;
 
 #define QLength 160
-#define PLength 2014
+#define PLength 1024
 
 #define BUFFER_SIZE BITLENTH/8
 
