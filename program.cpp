@@ -4,7 +4,9 @@
 #include <stdarg.h>
 using namespace std;
 
-#define BITLENTH 160
+#define QLength 160
+#define PLength 2014
+
 #define BUFFER_SIZE BITLENTH/8
 
 class BigInt{
@@ -20,7 +22,7 @@ class BigInt{
         }
 };
 
-BigInt GeneratePrime(){
+BigInt GeneratePrime(int BITLENTH){
 
     BigInt bi;
     char buf[BUFFER_SIZE];
@@ -46,9 +48,14 @@ BigInt GeneratePrime(){
 }
 
 int main(){
-    BigInt q = GeneratePrime();
-    gmp_printf ("%Zd\n", q.value);
+    BigInt q = GeneratePrime(QLength);
+    gmp_printf ("%Zd\n\n", q.value);
 
+    BigInt p;
+/*
+*find the p
+*/
+    gmp_printf ("%Zd\n", p.value);
 
     return 0;
 }
