@@ -51,10 +51,11 @@ int main(){
     BigInt q = GeneratePrime(QLength);
     gmp_printf ("%Zd\n\n", q.value);
 
-    BigInt p;
-/*
-*find the p
-*/
+    BigInt p = GeneratePrime(PLength);
+    while ( (p-1)%q!=0 ) {
+        p = GeneratePrime(PLength);
+    }
+    
     gmp_printf ("%Zd\n", p.value);
 
     return 0;
