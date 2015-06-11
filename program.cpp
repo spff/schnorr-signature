@@ -69,7 +69,7 @@ BigInt GenerateNBitIOOOOOI(int BITLENTH){
 
 int main(){
     BigInt q = GeneratePrime(QLength);
-    gmp_printf("%Zd\n\n", q.value);
+    gmp_printf("q = %Zd\n\n", q.value);
 
     BigInt temp = GenerateNBitIOOOOOI(PLength), times, p;
     mpz_cdiv_q(times.value, temp.value, q.value);
@@ -81,7 +81,25 @@ int main(){
         mpz_add_ui(times.value, times.value, 1);
     }
 
-    gmp_printf("%Zd\n", p.value);
+    gmp_printf("times = % Zd\n\np = %Zd\n\n", times.value, p.value);
+
+    BigInt a;
+    mpz_set_ui(temp.value, 3);
+    while(true){
+        /*int TLength = rand() % (PLength - 2) +1;
+        BigInt T = GeneratePrime(TLength);
+        */
+        mpz_powm(a.value, temp.value, times.value, p.value);
+        if(mpz_cmp_si(a.value, 1) > 0)
+            break;
+        mpz_add_ui(temp.value, temp.value, 1);
+    }
+
+    gmp_printf("a = % Zd\n\nt = %Zd\n\n", a.value, temp.value);
+
+mpz_powm(temp.value, a.value, q.value, p.value);
+gmp_printf("should be one = % Zd\n\n", temp.value);
+
 
     return 0;
 }
