@@ -5,7 +5,7 @@
 using namespace std;
 
 #define QLength 160
-#define PLength 1024
+#define PLength 2014
 
 #define BUFFER_SIZE BITLENTH/8
 
@@ -47,16 +47,41 @@ BigInt GeneratePrime(int BITLENTH){
     return bi;
 }
 
+BigInt GenerateNBitIOOOOOI(int BITLENTH){
+
+    BigInt bi;
+    char buf[BUFFER_SIZE];
+    int i;
+    mpz_t tmp1; mpz_init(tmp1);
+
+    // Set the bits of tmp to 0
+    for(i = 0; i < BUFFER_SIZE; i++)
+        buf[i] = 0x00;
+    // Set the top bit to 1
+    buf[0] = 0x80;
+    // Set the bottom bit to 1 to ensure int(tmp) is odd (better for finding primes)
+    buf[BUFFER_SIZE - 1] |= 0x01;
+    // Interpret this char buffer as an int
+    mpz_import(bi.value, BUFFER_SIZE, 1, sizeof(buf[0]), 0, 0, buf);
+
+    return bi;
+}
+
 int main(){
     BigInt q = GeneratePrime(QLength);
-    gmp_printf ("%Zd\n\n", q.value);
+    gmp_printf("%Zd\n\n", q.value);
 
-    BigInt p = GeneratePrime(PLength);
-    while ( (p-1)%q!=0 ) {
-        p = GeneratePrime(PLength);
+    BigInt temp = GenerateNBitIOOOOOI(PLength), times, p;
+    mpz_cdiv_q(times.value, temp.value, q.value);
+    while(true){
+        mpz_mul(p.value, q.value, times.value);
+        mpz_add_ui(p.value, p.value, 1);
+        if(mpz_probab_prime_p(p.value, 25) > 0)
+            break;
+        mpz_add_ui(times.value, times.value, 1);
     }
-    
-    gmp_printf ("%Zd\n", p.value);
+
+    gmp_printf("%Zd\n", p.value);
 
     return 0;
 }
