@@ -180,8 +180,13 @@ cout << e.length();
 cout << "e = hihi = " << hihi.Out() << endl << endl;
 
     mpz_mul (temp.value, SecretKey.value, hihi.value);
-    mpz_add (temp.value, R.value, temp.value);
+    mpz_sub (temp.value, R.value, temp.value);
     mpz_mod (Y.value, temp.value, q.value);
+
+
+
+
+
 
 //(A * B) mod C = (A mod C * B mod C) mod C
     BigInt Xp, temp2;
@@ -189,10 +194,7 @@ cout << "e = hihi = " << hihi.Out() << endl << endl;
     mpz_powm(temp2.value, V.value, hihi.value, p.value);
     mpz_mul (temp.value, temp.value, temp2.value);
     mpz_mod (Xp.value, temp.value, p.value);
-
-    tmp = mpz_get_str(NULL,10,Xp.value);
-    Str = tmp;
-    string ep = sha256(M + Str);
+    string ep = sha256(M + Xp.Out());
     cout << "ep = " << ep << endl << endl << " = e = " << e;
 
     return 0;
