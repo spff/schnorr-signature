@@ -2,12 +2,37 @@
 #include <stdio.h>
 #include <gmp.h>
 #include <stdarg.h>
+
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <string>
+
+#include <ostream>
+
 using namespace std;
+
+#include <openssl/sha.h>
 
 #define QLength 160
 #define PLength 2014
 
 #define BUFFER_SIZE BITLENTH/8
+
+string sha256(const string str)
+{
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, str.c_str(), str.size());
+    SHA256_Final(hash, &sha256);
+    stringstream ss;
+    for(int i = 0; i < SHA256_DIGEST_LENGTH; i++)
+    {
+        ss << hex << setw(2) << setfill('0') << (int)hash[i];
+    }
+    return ss.str();
+}
 
 class BigInt{
     public:
@@ -86,9 +111,7 @@ int main(){
     BigInt a;
     mpz_set_ui(temp.value, 3);
     while(true){
-        /*int TLength = rand() % (PLength - 2) +1;
-        BigInt T = GeneratePrime(TLength);
-        */
+
         mpz_powm(a.value, temp.value, times.value, p.value);
         if(mpz_cmp_si(a.value, 1) > 0)
             break;
@@ -96,9 +119,26 @@ int main(){
     }
 
     gmp_printf("a = % Zd\n\nt = %Zd\n\n", a.value, temp.value);
-
+//for verification
 mpz_powm(temp.value, a.value, q.value, p.value);
 gmp_printf("should be one = % Zd\n\n", temp.value);
+
+
+
+    int SecretKeyLength = rand() % (QLength - 2) +1;
+    BigInt SecretKey = GeneratePrime(SecretKeyLength);
+    gmp_printf("SecretKey = % Zd\n\n", SecretKey.value);
+
+
+    BigInt V;
+    mpz_powm(V.value, a.value, SecretKey.value, p.value);
+    gmp_printf("X = % Zd\n\n", V.value);
+
+    char * tmp = mpz_get_str(NULL,10,V.value);
+    string Str = tmp;
+
+    cout << sha256("I AM A SECRET FILE" + Str) << endl;
+
 
 
     return 0;
