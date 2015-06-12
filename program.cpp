@@ -1,3 +1,6 @@
+/* install openssl
+ * -lcrypto -lgmp
+ */
 #include <iostream>
 #include <stdio.h>
 #include <gmp.h>
@@ -10,13 +13,13 @@
 #include <string.h>
 #include <ostream>
 
+#include <openssl/sha.h>
+
 using namespace std;
 
-#include <openssl/sha.h>
 
 #define QLength 160
 #define PLength 2014
-
 #define BUFFER_SIZE BITLENTH/8
 
 string sha256(const string str)
@@ -45,6 +48,14 @@ class BigInt{
         ~BigInt(){
             mpz_clear(value);
         }
+        string Outbase(int base){
+            string Str{mpz_get_str(NULL, base, value)};
+            return Str;
+        }
+        string Out(){
+            string Str{mpz_get_str(NULL, 10, value)};
+            return Str;
+        }
 };
 
 BigInt GeneratePrime(int BITLENTH){
@@ -55,7 +66,6 @@ BigInt GeneratePrime(int BITLENTH){
     mpz_t tmp1; mpz_init(tmp1);
 
     srand(time(NULL));
-
 
     // Set the bits of tmp randomly
     for(i = 0; i < BUFFER_SIZE; i++)
@@ -94,9 +104,9 @@ BigInt GenerateNBitIOOOOOI(int BITLENTH){
 
 int main(){
     BigInt q = GeneratePrime(QLength);
-    gmp_printf("q = %Zd\n\n", q.value);
+    cout << "q = " << q.Out() << endl << endl;
 
-    BigInt temp = GenerateNBitIOOOOOI(PLength), times, p;
+    BigInt times, p, temp = GenerateNBitIOOOOOI(PLength);
     mpz_cdiv_q(times.value, temp.value, q.value);
     while(true){
         mpz_mul(p.value, q.value, times.value);
@@ -105,76 +115,75 @@ int main(){
             break;
         mpz_add_ui(times.value, times.value, 1);
     }
-
-    gmp_printf("times = % Zd\n\np = %Zd\n\n", times.value, p.value);
+    cout << "times = " << times.Out() << endl << endl;
+    cout << "p = " << p.Out() << endl << endl;
 
     BigInt a;
     mpz_set_ui(temp.value, 3);
-    while(true){
 
+    while(true){
         mpz_powm(a.value, temp.value, times.value, p.value);
         if(mpz_cmp_si(a.value, 1) > 0)
             break;
         mpz_add_ui(temp.value, temp.value, 1);
     }
-
-    gmp_printf("a = % Zd\n\nt = %Zd\n\n", a.value, temp.value);
+    cout << "a = " << a.Out() << endl << endl;
+    cout << "temp = " << temp.Out() << endl << endl;
 
 //for verification
 mpz_powm(temp.value, a.value, q.value, p.value);
-gmp_printf("should be one = % Zd\n\n", temp.value);
-
+cout << "should be one = " << temp.Out() << endl << endl;
 
 
     int SecretKeyLength = rand() % (QLength - 2) +1;
     BigInt SecretKey = GeneratePrime(SecretKeyLength);
-    gmp_printf("SecretKey = % Zd\n\n", SecretKey.value);
-
+    cout << "SecretKey = " << SecretKey.Out() << endl << endl;
 
     BigInt V;
     mpz_powm(V.value, a.value, SecretKey.value, p.value);
-    gmp_printf("V = % Zd\n\n", V.value);
+    cout << "V = " << V.Out() << endl << endl;
 
     char * tmp = mpz_get_str(NULL,10,V.value);
     string Str = tmp;
 
 
 string M = "I AM A SECRET FILE";
+cout << "M = " << M << endl << endl;
 
     string e = sha256(M + Str);
     cout << "e = " << e << endl;
 
     int RLength = rand() % (QLength - 2) +1;
     BigInt R = GeneratePrime(RLength);
-    gmp_printf("SecretKey = % Zd\n\n", R.value);
+    cout << "R = " << R.Out() << endl << endl;
 
     BigInt X;
     mpz_powm(X.value, a.value, R.value, p.value);
-    gmp_printf("X = % Zd\n\n", X.value);
-
+    cout << "X = " << X.Out() << endl << endl;
 
     BigInt Y, hihi;
 
-    uint8_t input[e.length()];
+    char input[e.length()];
+    int tt;
+    for(int i = 0;i < e.length();i++){
+        mpz_mul_ui (hihi.value, hihi.value, 16);
+        if(e[i] < 60)
+            tt = e[i] - 48;
+        else
+            tt = e[i] - 87;
 
-    for(int i = 0;i < e.length();i+=2){
-
-        input[i] = (unsigned int)e[i]*16 + (unsigned int)e[i+1];
+        mpz_add_ui(hihi.value, hihi.value, tt);
     }
 cout << e.length();
-    mpz_import(hihi.value, e.length()/3, 1, sizeof(input[0]), 0, 0, input);
 
-gmp_printf("e = hihi = % Zd\n\n", hihi.value);
 
+cout << "e = hihi = " << hihi.Out() << endl << endl;
 
     mpz_mul (temp.value, SecretKey.value, hihi.value);
     mpz_add (temp.value, R.value, temp.value);
     mpz_mod (Y.value, temp.value, q.value);
 
-
-
 //(A * B) mod C = (A mod C * B mod C) mod C
-
     BigInt Xp, temp2;
     mpz_powm(temp.value, a.value, Y.value, p.value);
     mpz_powm(temp2.value, V.value, hihi.value, p.value);
