@@ -7,7 +7,7 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
-
+#include <string.h>
 #include <ostream>
 
 using namespace std;
@@ -119,6 +119,7 @@ int main(){
     }
 
     gmp_printf("a = % Zd\n\nt = %Zd\n\n", a.value, temp.value);
+
 //for verification
 mpz_powm(temp.value, a.value, q.value, p.value);
 gmp_printf("should be one = % Zd\n\n", temp.value);
@@ -132,14 +133,58 @@ gmp_printf("should be one = % Zd\n\n", temp.value);
 
     BigInt V;
     mpz_powm(V.value, a.value, SecretKey.value, p.value);
-    gmp_printf("X = % Zd\n\n", V.value);
+    gmp_printf("V = % Zd\n\n", V.value);
 
     char * tmp = mpz_get_str(NULL,10,V.value);
     string Str = tmp;
 
-    cout << sha256("I AM A SECRET FILE" + Str) << endl;
+
+string M = "I AM A SECRET FILE";
+
+    string e = sha256(M + Str);
+    cout << "e = " << e << endl;
+
+    int RLength = rand() % (QLength - 2) +1;
+    BigInt R = GeneratePrime(RLength);
+    gmp_printf("SecretKey = % Zd\n\n", R.value);
+
+    BigInt X;
+    mpz_powm(X.value, a.value, R.value, p.value);
+    gmp_printf("X = % Zd\n\n", X.value);
 
 
+    BigInt Y, hihi;
+
+    uint8_t input[e.length()];
+
+    for(int i = 0;i < e.length();i+=2){
+
+        input[i] = (unsigned int)e[i]*16 + (unsigned int)e[i+1];
+    }
+cout << e.length();
+    mpz_import(hihi.value, e.length()/3, 1, sizeof(input[0]), 0, 0, input);
+
+gmp_printf("e = hihi = % Zd\n\n", hihi.value);
+
+
+    mpz_mul (temp.value, SecretKey.value, hihi.value);
+    mpz_add (temp.value, R.value, temp.value);
+    mpz_mod (Y.value, temp.value, q.value);
+
+
+
+//(A * B) mod C = (A mod C * B mod C) mod C
+
+    BigInt Xp, temp2;
+    mpz_powm(temp.value, a.value, Y.value, p.value);
+    mpz_powm(temp2.value, V.value, hihi.value, p.value);
+    mpz_mul (temp.value, temp.value, temp2.value);
+    mpz_mod (Xp.value, temp.value, p.value);
+
+    tmp = mpz_get_str(NULL,10,Xp.value);
+    Str = tmp;
+    string ep = sha256(M + Str);
+    cout << "ep = " << ep << endl << endl << " = e = " << e;
 
     return 0;
 }
