@@ -34,7 +34,10 @@ public:
     mpz_class p, q, v, a , SecretKey;
     Key(mpz_class p,mpz_class q,mpz_class v,mpz_class a,mpz_class SecretKey){
         this->p = p;
-
+        this->q = q;
+        this->v = v;
+        this->a = a;
+        this->SecretKey = SecretKey;
     }
 };
 
@@ -50,20 +53,14 @@ class KeyGenerator{
 
     public:
         void start(){
-            int i = 500;
-            while(!END){
+          //  while(!END){
                 mutx.lock();
                     if(KeyQueue.size() < 1){
                         GenerateKey();
                         KeyQueue.push(Key{p, q, v, a, SecretKey});
-                        cout << "insert " << i << "   ";
-                        i--;
                     }
                 mutx.unlock();
-                if(i  == 0)
-                    END = true;
-            }
-
+         //   }
         }
     private:
         void GenerateKey(){
@@ -109,6 +106,7 @@ cout << "should be one = " << temp << endl << endl;
             SecretKey = rr.get_z_bits (rand() % (QLength*2/3 - 1) + QLength/3);
             cout << "SecretKey = " << SecretKey << endl << endl;
 
+        //a^s %p = v
             mpz_powm(v.get_mpz_t(), a.get_mpz_t(), SecretKey.get_mpz_t(), p.get_mpz_t());
             cout << "v = " << v << endl << endl;
         }
@@ -262,13 +260,14 @@ class Mission{
                               SecretKey = k->SecretKey,
                               r, x, e, y;
 
+
         //generate random r
             r = rr.get_z_bits (rand() % (QLength*2/3 - 1) + QLength/3);
             cout << "r = " << r << endl << endl;
+
         //make a^r % p = x
             mpz_powm(x.get_mpz_t(), a.get_mpz_t(), r.get_mpz_t(), p.get_mpz_t());
             cout << "x = " << x << endl << endl;
-
 
             ifstream inputfile(filename, ios::in | ios::binary);
             stringstream M;
@@ -279,6 +278,7 @@ class Mission{
 
             char input[e_str.length()];
             int tt;
+
         //transfer e_str to e
             for(int i = 0;i < e_str.length();i++){
                 mpz_mul_2exp(e.get_mpz_t(), e.get_mpz_t(), 4);
@@ -289,13 +289,15 @@ class Mission{
                 e += tt;
             }
             cout << e_str.length() << endl << endl << "e_mpz 10based = " << e << endl << endl;
-        //generate y
 
-            y = (r - e * SecretKey) % q;
+        //generate y
+            y = (r + e * SecretKey) % q;
+            cout << "y = " << y << endl << endl;
+
 //r and secretkey will be secret
 //write out p v a e y
-            ofstream sig(signame, ios::out | ios::binary | trunc);
-            sig << p << endl << v << endl << a << endl << e << endl << y;
+            ofstream sig(signame, ios::out | ios::binary | ios::trunc);
+            sig << p << endl << v << endl << a << endl << e << endl << y << endl;
             sig.close();
         }
 
@@ -306,10 +308,17 @@ class Mission{
             sig >> p >> v >> a >> e >> y;
             sig.close();
 
+cout << y << endl<< endl;
+
+/*
         //(A * B) mod C = (A mod C * B mod C) mod C
             mpz_powm(temp.get_mpz_t(), a.get_mpz_t(), y.get_mpz_t(), p.get_mpz_t());
             mpz_powm(xp.get_mpz_t(), v.get_mpz_t(), e.get_mpz_t(), p.get_mpz_t());
-            temp = (xp * temp) % p;
+            temp = (xp * temp) % p;*/
+
+    xp = ((a^y) * (v^-e)) % p ;
+cout << "xp = " << xp << endl << endl;
+
 
             ifstream inputfile(filename, ios::in | ios::binary);
             stringstream M;
@@ -318,8 +327,9 @@ class Mission{
 
             string ep = sha256(M.str() + xp.get_str());
             cout << "ep = " << ep << endl << endl << " = e = " << e;
-//
+
         }
+
         string sha256(const string str){
             unsigned char hash[SHA256_DIGEST_LENGTH];
             SHA256_CTX sha256;
@@ -328,9 +338,8 @@ class Mission{
             SHA256_Final(hash, &sha256);
             stringstream ss;
             for(int i = 0; i < SHA256_DIGEST_LENGTH; i++)
-            {
                 ss << hex << setw(2) << setfill('0') << (int)hash[i];
-            }
+
             return ss.str();
         }
 };
