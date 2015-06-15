@@ -1,5 +1,0 @@
-Write a GMP-based program that can perform Schnorr signature scheme.
-The students should use the basic operations of cryptography in GMP to write the
-program. Moreover, the hash function program, such as SHA, can be found (some
-open source programs) on Internet in C language. The students should also write
-an UI to process the file for key generation, signing and verification.
