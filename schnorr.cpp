@@ -1,49 +1,42 @@
-/* install openssl, have gmp ./configure --enable-cxx
- *should create etc/ld.so.conf.d/gmp.conf  write "/usr/local/lib" then, run ldconfig
- * -lcrypto -lgmpxx -lgmp -pthread
- *
- *  todo    :make it work as batch
- */
-#include <iostream>
+//TODO    :make it batch sign whole directory
+
 #include <stdio.h>
 #include <gmpxx.h>
-#include <stdarg.h>
 
 #include <iomanip>
-#include <sstream>
+#include <openssl/sha.h>
+
+#include <iostream>
 #include <string>
-#include <string.h>
-#include <ostream>
+#include <sstream>
+#include <fstream>
 #include <thread>
 #include <mutex>
 #include <queue>
-#include <fstream>
-
-#include <openssl/sha.h>
+#include <vector>
 
 #define QLength 256
 #define PLength 1024
 #define BUFFER_SIZE BITLENTH/8
-#define MAXSAVEDKEY 1
+#define MAXSAVEDKEY 2
 
-#define DEBUG 0
+#define DEBUG 1
 
 using namespace std;
 
 class Key{
-public:
-    int i;
-    mpz_class p, q, v, a , SecretKey;
-    Key(){}
-    Key(mpz_class p,mpz_class q,mpz_class v,mpz_class a,mpz_class SecretKey){
-        this->p = p;
-        this->q = q;
-        this->v = v;
-        this->a = a;
-        this->SecretKey = SecretKey;
-    }
+    public:
+        int i;
+        mpz_class p, q, v, a , privatekey;
+        Key(){}
+        Key(mpz_class p,mpz_class q,mpz_class v,mpz_class a,mpz_class privatekey){
+            this->p = p;
+            this->q = q;
+            this->v = v;
+            this->a = a;
+            this->privatekey = privatekey;
+        }
 };
-
 
 mutex mutx;
 queue<Key> KeyQueue;
@@ -52,18 +45,18 @@ bool END;
 
 class KeyGenerator{
     private:
-            mpz_class p, q, n, a, SecretKey, v, temp;
+            mpz_class p, q, n, a, privatekey, v, temp;
 
     public:
         void start(){
-//            while(!END){
+            while(!END){
                 mutx.lock();
                     if(KeyQueue.size() < 1){
                         GenerateKey();
-                        KeyQueue.push(Key{p, q, v, a, SecretKey});
+                        KeyQueue.push(Key{p, q, v, a, privatekey});
                     }
                 mutx.unlock();
-//            }
+            }
         }
     private:
         void GenerateKey(){
@@ -71,15 +64,13 @@ class KeyGenerator{
             gmp_randclass rr(gmp_randinit_default);
             rr.seed(time(NULL));
 
-        //use this method to prevent q overflow
+            //This method is going to prevent q overflow
             q = 1;
             mpz_mul_2exp(q.get_mpz_t(), q.get_mpz_t(), QLength - 1);//shift to QLength
-cout << "q = " << q << endl << endl;
             q += rr.get_z_bits (QLength-2);
             mpz_nextprime(q.get_mpz_t(), q.get_mpz_t());
-            cout << "q = " << q << endl << endl;
 
-        //MAKE p = q*n + 1 and should be a PLength-long prime
+            //p = q*n + 1 and should be a PLength-long prime
             p = 1;
             mpz_mul_2exp(p.get_mpz_t(), p.get_mpz_t(), PLength - 1);//shift to PLength
             n = p / q;
@@ -90,36 +81,27 @@ cout << "q = " << q << endl << endl;
                 n++;
             }
 
-            cout << "n = " << n << endl << endl << "p = " << p << endl << endl;
-
-        //make a^q % p = 1
-        //so first make temp^n % p = a, a != (0or1)
-            temp = 3;
-
-if(DEBUG){
-q=103;p=2267;temp=2;n=22;
-}
+            //a^q % p = 1
+            //so first, a = temp^n % p, a > 1
+            temp = 2;
             while(true){
                 mpz_powm(a.get_mpz_t(), temp.get_mpz_t(), n.get_mpz_t(), p.get_mpz_t());
                 if(a > 1)
                     break;
                 temp++;
             }
-            cout << "a = " << a << endl << endl << "temp = " << temp << endl << endl;
 
             //for verification
             mpz_powm(temp.get_mpz_t(), a.get_mpz_t(), q.get_mpz_t(), p.get_mpz_t());
-            cout << "should be one = " << temp << endl << endl;
+            if(temp != 1){
+                cerr << "error";
+                exit(-1);
+            }
 
-            SecretKey = rr.get_z_bits (rand() % (QLength*2/3 - 1) + QLength/3);
-            cout << "SecretKey = " << SecretKey << endl << endl;
+            privatekey = rr.get_z_bits (rand() % (QLength*2/3 - 1) + QLength/3);
 
-if(DEBUG){
-SecretKey=30;
-}
-        //a^s %p = v
-            mpz_powm(v.get_mpz_t(), a.get_mpz_t(), SecretKey.get_mpz_t(), p.get_mpz_t());
-            cout << "v = " << v << endl << endl;
+            //a^s % p = v
+            mpz_powm(v.get_mpz_t(), a.get_mpz_t(), privatekey.get_mpz_t(), p.get_mpz_t());
         }
 
 };
@@ -186,44 +168,54 @@ class Mission{
             }
 
             else{
-                if((argv[1] == "-h") || (argv[1] == "--help")){
-                    cout  << "Usage: " << argv[0] << "  [-sv FILE [SIGFILE]]" << endl << "            -s Sign" << "            -v Verify" << endl;
+
+                END = true;
+
+                vector<string> argvs;
+                string ts;
+                for(int i = 0;i < argc;i++){
+                    ts = argv[i];
+                    argvs.push_back(ts);
+                }
+
+                if((argvs[1] == "-h") || (argvs[1] == "--help")){
+                    cout  << "Usage: " << argvs[0] << "  [-sv FILE [SIGFILE]]" << endl << "            -s Sign" << endl << "            -v Verify" << endl;
                     return 0;
                 }
-                if(argv[1] == "-s"){
+                if(argvs[1] == "-s"){
                     if(argc == 3){
-                        filename = argv[2];
+                        filename = argvs[2];
                         signame = filename + ".sig";
                         cout << "the sig file will be " << filename << ".sig" << endl;
                     }
                     else if(argc == 4){
-                        filename = argv[2];
-                        signame = argv[3];
+                        filename = argvs[2];
+                        signame = argvs[3];
                     }
                     else{
-                        cout << "type " << argv[0] << "-h or --help for help, or just type " << argv[0] << " to enter interactive mode";
+                        cout << "type " << argvs[0] << "-h or --help for help, or just type " << argvs[0] << " to enter interactive mode";
                         return 0;
                     }
                     return CheckFile(1);
                 }
-                else if(argv[1] == "-v"){
+                else if(argvs[1] == "-v"){
                     if(argc == 3){
-                        filename = argv[2];
+                        filename = argvs[2];
                         signame = filename + ".sig";
                         cout << "using " << filename << ".sig as sigfile..." << endl;
                     }
                     else if(argc == 4){
-                        filename = argv[2];
-                        signame = argv[3];
+                        filename = argvs[2];
+                        signame = argvs[3];
                     }
                     else{
-                        cout << "type " << argv[0] << "-h or --help for help, or just type " << argv[0] << " to enter interactive mode";
+                        cout << "type " << argvs[0] << "-h or --help for help, or just type " << argvs[0] << " to enter interactive mode";
                         return 0;
                     }
                     return CheckFile(2);
                 }
                 else{
-                    cout << "type " << argv[0] << "-h or --help for help, or just type " << argv[0] << " to enter interactive mode";
+                    cout << "type " << argvs[0] << "-h or --help for help, or just type " << argvs[0] << " to enter interactive mode";
                     return 0;
                 }
             }
@@ -268,99 +260,66 @@ class Mission{
                               q = k.q,
                               v = k.v,
                               a = k.a,
-                              SecretKey = k.SecretKey,
+                              privatekey = k.privatekey,
                               r, x, e, y;
 
             //generate random r
             r = rr.get_z_bits (rand() % (QLength*2/3 - 1) + QLength/3);
-            cout << "r = " << r << endl << endl;
 
-if(DEBUG){
-r=11;
-cout << a << "^" << r << "%" << p << "=" << endl;
-}
-            //make a^r % p = x
+            //x = a^r % p
             mpz_powm(x.get_mpz_t(), a.get_mpz_t(), r.get_mpz_t(), p.get_mpz_t());
-            cout << "x = " << x << endl << endl;
 
             ifstream inputfile(filename, ios::in | ios::binary);
             stringstream M;
             M << inputfile.rdbuf();
 
-if(DEBUG){
-M.str("1000");
-string sss = M.str() + x.get_str();
-cout << sss << endl;
-}
             string e_str = sha256(M.str() + x.get_str());
             cout << "e_str = " << e_str << endl;
             inputfile.close();
 
-            char input[e_str.length()];
-            int tt;
+            e = HexStringToMpz(e_str);
 
-        //transfer e_str to e
-            for(int i = 0;i < e_str.length();i++){
-                mpz_mul_2exp(e.get_mpz_t(), e.get_mpz_t(), 4);
-                if(e_str[i] < 60)
-                    tt = e_str[i] - 48;
-                else
-                    tt = e_str[i] - 87;
-                e += tt;
-            }
-            cout << e_str.length() << endl << endl << "e_mpz 10based = " << e << endl << endl;
+            //generate y
+            y = (r + privatekey * e) % q;
 
-if(DEBUG){
-e=200;
-}
-
-        //generate y
-            y = (r + SecretKey * e) % q;
-            cout << "y = " << y << endl << endl;
-
-//r and secretkey will be secret
-//write out p q v a e y
+            //r and privatekey will be secret
             ofstream sig(signame, ios::out | ios::binary | ios::trunc);
-            sig << p << endl << q << endl << v << endl << a << endl << e << endl << y << endl;
+            sig << p << endl << v << endl << a << endl << e << endl << y << endl;
             sig.close();
+
+if(DEBUG)
+    cout << "privatekey = " << privatekey  << endl << "r = " << r  << endl << "p = " << p  << endl << "q = " << q << endl  << "v = " << v << endl << "a = " << a << endl << "e = " << e << endl << "y = " << y << endl << "x = " << x  << endl << endl;
         }
 
         void Verify(){
 
-            mpz_class xp, temp, temp2, p, q, v, a, e, y;
+            mpz_class xp, temp, temp2, p, v, a, e, y, ep;
             ifstream sig(signame, ios::in | ios::binary);
-            sig >> p >> q >> v >> a >> e >> y;
+            sig >> p >> v >> a >> e >> y;
             sig.close();
 
-cout << "p = " << p << endl << "q = " << q << endl << "v = " << v << endl << "a = " << a << endl << "e = " << e << endl << "y = " << y << endl;
-
-
-
-
-cout << "q = " << q << endl << endl << "e = " << e << endl << endl;
-
-        //(A * B) mod C = (A mod C * B mod C) mod C
+            //xp = ((a^y) * (v^(-e))) % p ;
+            //(A * B) mod C = (A mod C * B mod C) mod C
             temp2 = -e;
             mpz_powm(temp.get_mpz_t(), a.get_mpz_t(), y.get_mpz_t(), p.get_mpz_t());
             mpz_powm(xp.get_mpz_t(), v.get_mpz_t(), temp2.get_mpz_t(), p.get_mpz_t());
             xp = (xp * temp) % p;
 
-//    xp = ((a^y) * (v^(-e))) % p ;
-cout << "xp = " << xp << endl << endl;
-
-
             ifstream inputfile(filename, ios::in | ios::binary);
             stringstream M;
             M << inputfile.rdbuf();
             inputfile.close();
 
-if(DEBUG){
-M.str("1000");
-}
+            string ep_str = sha256(M.str() + xp.get_str());
+            ep = HexStringToMpz(ep_str);
 
-            string ep = sha256(M.str() + xp.get_str());
-            cout << "ep = " << ep << endl << endl << " = e = " << e;
+if(DEBUG)
+    cout << "p = " << p  << endl << "v = " << v << endl << "a = " << a << endl << "e = " << e << endl << "y = " << y << endl << "xp = " << xp << endl << ep_str << endl << endl;
 
+            if(ep == e)
+                cout << "Match" << endl;
+            else
+                cout << "Not Match" << endl;
         }
 
         string sha256(const string str){
@@ -375,6 +334,20 @@ M.str("1000");
 
             return ss.str();
         }
+
+        mpz_class HexStringToMpz(string e_str){
+            int tt;
+            mpz_class e = 0;
+            for(unsigned int i = 0;i < e_str.length();i++){
+                mpz_mul_2exp(e.get_mpz_t(), e.get_mpz_t(), 4);
+                if(e_str[i] < 60)
+                    tt = e_str[i] - 48;
+                else
+                    tt = e_str[i] - 87;
+                e += tt;
+            }
+            return e;
+        }
 };
 
 int main(int argc, char* argv[]){
@@ -386,6 +359,5 @@ int main(int argc, char* argv[]){
     thread t2{&Mission::start, mission};
     t1.join();
     t2.join();
-    cout << "exit" << endl;
     return 0;
 }
