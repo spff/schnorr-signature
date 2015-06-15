@@ -21,10 +21,12 @@
 
 #include <openssl/sha.h>
 
-#define QLength 160
-#define PLength 2014
+#define QLength 256
+#define PLength 1024
 #define BUFFER_SIZE BITLENTH/8
 #define MAXSAVEDKEY 1
+
+#define DEBUG 0
 
 using namespace std;
 
@@ -32,6 +34,7 @@ class Key{
 public:
     int i;
     mpz_class p, q, v, a , SecretKey;
+    Key(){}
     Key(mpz_class p,mpz_class q,mpz_class v,mpz_class a,mpz_class SecretKey){
         this->p = p;
         this->q = q;
@@ -53,14 +56,14 @@ class KeyGenerator{
 
     public:
         void start(){
-          //  while(!END){
+//            while(!END){
                 mutx.lock();
                     if(KeyQueue.size() < 1){
                         GenerateKey();
                         KeyQueue.push(Key{p, q, v, a, SecretKey});
                     }
                 mutx.unlock();
-         //   }
+//            }
         }
     private:
         void GenerateKey(){
@@ -71,6 +74,7 @@ class KeyGenerator{
         //use this method to prevent q overflow
             q = 1;
             mpz_mul_2exp(q.get_mpz_t(), q.get_mpz_t(), QLength - 1);//shift to QLength
+cout << "q = " << q << endl << endl;
             q += rr.get_z_bits (QLength-2);
             mpz_nextprime(q.get_mpz_t(), q.get_mpz_t());
             cout << "q = " << q << endl << endl;
@@ -91,6 +95,10 @@ class KeyGenerator{
         //make a^q % p = 1
         //so first make temp^n % p = a, a != (0or1)
             temp = 3;
+
+if(DEBUG){
+q=103;p=2267;temp=2;n=22;
+}
             while(true){
                 mpz_powm(a.get_mpz_t(), temp.get_mpz_t(), n.get_mpz_t(), p.get_mpz_t());
                 if(a > 1)
@@ -99,13 +107,16 @@ class KeyGenerator{
             }
             cout << "a = " << a << endl << endl << "temp = " << temp << endl << endl;
 
-//for verification
-mpz_powm(temp.get_mpz_t(), a.get_mpz_t(), q.get_mpz_t(), p.get_mpz_t());
-cout << "should be one = " << temp << endl << endl;
+            //for verification
+            mpz_powm(temp.get_mpz_t(), a.get_mpz_t(), q.get_mpz_t(), p.get_mpz_t());
+            cout << "should be one = " << temp << endl << endl;
 
             SecretKey = rr.get_z_bits (rand() % (QLength*2/3 - 1) + QLength/3);
             cout << "SecretKey = " << SecretKey << endl << endl;
 
+if(DEBUG){
+SecretKey=30;
+}
         //a^s %p = v
             mpz_powm(v.get_mpz_t(), a.get_mpz_t(), SecretKey.get_mpz_t(), p.get_mpz_t());
             cout << "v = " << v << endl << endl;
@@ -241,37 +252,46 @@ class Mission{
 
         void Sign(){
 
-            Key *k;
+            Key k;
 
             gmp_randclass rr(gmp_randinit_default);
             rr.seed(time(NULL));
 
             mutx.lock();
                 if(KeyQueue.size() > 0){
-                    k = &KeyQueue.front();
+                    k = KeyQueue.front();
                     KeyQueue.pop();
                 }
             mutx.unlock();
 
-            mpz_class p = k->p,
-                              q = k->q,
-                              v = k->v,
-                              a = k->a,
-                              SecretKey = k->SecretKey,
+            mpz_class p = k.p,
+                              q = k.q,
+                              v = k.v,
+                              a = k.a,
+                              SecretKey = k.SecretKey,
                               r, x, e, y;
 
-
-        //generate random r
+            //generate random r
             r = rr.get_z_bits (rand() % (QLength*2/3 - 1) + QLength/3);
             cout << "r = " << r << endl << endl;
 
-        //make a^r % p = x
+if(DEBUG){
+r=11;
+cout << a << "^" << r << "%" << p << "=" << endl;
+}
+            //make a^r % p = x
             mpz_powm(x.get_mpz_t(), a.get_mpz_t(), r.get_mpz_t(), p.get_mpz_t());
             cout << "x = " << x << endl << endl;
 
             ifstream inputfile(filename, ios::in | ios::binary);
             stringstream M;
             M << inputfile.rdbuf();
+
+if(DEBUG){
+M.str("1000");
+string sss = M.str() + x.get_str();
+cout << sss << endl;
+}
             string e_str = sha256(M.str() + x.get_str());
             cout << "e_str = " << e_str << endl;
             inputfile.close();
@@ -290,33 +310,42 @@ class Mission{
             }
             cout << e_str.length() << endl << endl << "e_mpz 10based = " << e << endl << endl;
 
+if(DEBUG){
+e=200;
+}
+
         //generate y
-            y = (r + e * SecretKey) % q;
+            y = (r + SecretKey * e) % q;
             cout << "y = " << y << endl << endl;
 
 //r and secretkey will be secret
-//write out p v a e y
+//write out p q v a e y
             ofstream sig(signame, ios::out | ios::binary | ios::trunc);
-            sig << p << endl << v << endl << a << endl << e << endl << y << endl;
+            sig << p << endl << q << endl << v << endl << a << endl << e << endl << y << endl;
             sig.close();
         }
 
         void Verify(){
 
-            mpz_class xp, temp, temp2, p, v, a, e, y;
+            mpz_class xp, temp, temp2, p, q, v, a, e, y;
             ifstream sig(signame, ios::in | ios::binary);
-            sig >> p >> v >> a >> e >> y;
+            sig >> p >> q >> v >> a >> e >> y;
             sig.close();
 
-cout << y << endl<< endl;
+cout << "p = " << p << endl << "q = " << q << endl << "v = " << v << endl << "a = " << a << endl << "e = " << e << endl << "y = " << y << endl;
 
-/*
+
+
+
+cout << "q = " << q << endl << endl << "e = " << e << endl << endl;
+
         //(A * B) mod C = (A mod C * B mod C) mod C
+            temp2 = -e;
             mpz_powm(temp.get_mpz_t(), a.get_mpz_t(), y.get_mpz_t(), p.get_mpz_t());
-            mpz_powm(xp.get_mpz_t(), v.get_mpz_t(), e.get_mpz_t(), p.get_mpz_t());
-            temp = (xp * temp) % p;*/
+            mpz_powm(xp.get_mpz_t(), v.get_mpz_t(), temp2.get_mpz_t(), p.get_mpz_t());
+            xp = (xp * temp) % p;
 
-    xp = ((a^y) * (v^-e)) % p ;
+//    xp = ((a^y) * (v^(-e))) % p ;
 cout << "xp = " << xp << endl << endl;
 
 
@@ -324,6 +353,10 @@ cout << "xp = " << xp << endl << endl;
             stringstream M;
             M << inputfile.rdbuf();
             inputfile.close();
+
+if(DEBUG){
+M.str("1000");
+}
 
             string ep = sha256(M.str() + xp.get_str());
             cout << "ep = " << ep << endl << endl << " = e = " << e;
