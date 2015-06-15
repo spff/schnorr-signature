@@ -19,6 +19,5 @@ one possible way is to create etc/ld.so.conf.d/gmp.conf  put "/usr/local/lib" in
 
 #Go Through the program
 Edit MAXSAVEDKEY for the limit of pairs of key to genarate and put in the keyqueue for use.
-QLength 256 This program implement Hash with SHA-256, so make the QLength = 256 
-PLength 1024
+This program implement Hash with SHA-256, so make the QLength = 256
 DEBUG 1 for debug..., and 0 for release
