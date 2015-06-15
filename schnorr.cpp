@@ -17,9 +17,7 @@
 
 #define QLength 256
 #define PLength 1024
-#define BUFFER_SIZE BITLENTH/8
 #define MAXSAVEDKEY 2
-
 #define DEBUG 1
 
 using namespace std;
@@ -286,7 +284,7 @@ class Mission{
             ofstream sig(signame, ios::out | ios::binary | ios::trunc);
             sig << p << endl << v << endl << a << endl << e << endl << y << endl;
             sig.close();
-
+            cout << "DONE!" << endl << endl;
 if(DEBUG)
     cout << "privatekey = " << privatekey  << endl << "r = " << r  << endl << "p = " << p  << endl << "q = " << q << endl  << "v = " << v << endl << "a = " << a << endl << "e = " << e << endl << "y = " << y << endl << "x = " << x  << endl << endl;
         }
@@ -317,9 +315,9 @@ if(DEBUG)
     cout << "p = " << p  << endl << "v = " << v << endl << "a = " << a << endl << "e = " << e << endl << "y = " << y << endl << "xp = " << xp << endl << ep_str << endl << endl;
 
             if(ep == e)
-                cout << "Match" << endl;
+                cout << "Match" << endl << endl;
             else
-                cout << "Not Match" << endl;
+                cout << "Not Match" << endl << endl;
         }
 
         string sha256(const string str){
