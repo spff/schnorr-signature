@@ -1,4 +1,4 @@
-# Schnorr_Signature
+# schnorr-signature
 This program is written in C++11,
 can sign or verify files using Schnorr_Signature.
 Interactive mode(rather than passing arguement) is recommended, this can get full advantage of Schnorr algorithm
